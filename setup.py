@@ -8,11 +8,18 @@ runtime_dependencies = [
 ]
 
 build_dependencies = [
-  'wheel',  # A built-package format for Python
+  'wheel',
 ]
 
 dev_dependencies = build_dependencies + [
-  'flake8'
+  'pylint',
+  'flake8',
+  'flake8-docstrings',
+  'pytest',
+  'pytest-cov',
+  'pytest-html',
+  'pytest-xdist',
+  'coverage',
 ]
 
 setup(
