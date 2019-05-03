@@ -30,7 +30,7 @@ class InputPipeline(object):
     """
     filenames = tf.data.Dataset.from_tensor_slices(tfrecord_paths)
     dataset = tf.data.TFRecordDataset(
-        filenames=filenames, num_parallel_reads=self._autotune)
+        filenames=filenames, num_parallel_reads=6)
     dataset = dataset.map(self._data_model.deserialize, num_parallel_calls=self._autotune)
 
     if is_training:
