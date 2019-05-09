@@ -1,4 +1,5 @@
 import tensorflow as tf
+import pandas as pd
 from typing import Dict, List
 
 from .item_handler import ItemHandler, NPArrayHandler
@@ -29,21 +30,8 @@ class DataModel(object):
       serialized=record,
       features=self._deserialize_dict()
     )
-    # If an item is an image convert bytes to tf.Tensor.
     for item_handler in self._item_handlers:
-      if isinstance(item_handler, NPArrayHandler):
-        np_key = item_handler.key
-        height = parsed_example[item_handler._height_key()]
-        width = parsed_example[item_handler._width_key()]
-        depth = parsed_example[item_handler._depth_key()]
-        parsed_example[np_key] = tf.io.decode_raw(
-          bytes=parsed_example[np_key],
-          out_type=item_handler.tf_dtype
-        )
-        parsed_example[np_key] = tf.reshape(
-          tensor=parsed_example[np_key],
-          shape=[height, width, depth]
-        )
+      parsed_example = item_handler.deserialization_post_processing(parsed_example)
     return parsed_example
 
   def serialize(self, data: Dict) -> tf.train.Example:
@@ -72,3 +60,34 @@ class DataModel(object):
         serialized_data = self.serialize(data=data)
         serialized_data_str = serialized_data.SerializeToString()
         writer.write(serialized_data_str)
+
+  def export_to_tfrecord(self,
+                         dataframe: pd.DataFrame,
+                         output_dir: str,
+                         max_size: float):
+    """Export a `pd.DataFrame` to one or more tfrecord files.
+
+    This method map data extracted from a `pd.DataFrame` into a series of
+    tfrecord files which size does not exceed a defined amount.
+
+    Args:
+      dataframe: A a `pd.DataFrame` containing items to be serialized.
+      output_dir: Directory where the output tfrecord will be saved.
+      max_size: Maximum size of a tfrecord.
+    """
+    column_needed = [item_handler.key for item_handler in self._item_handlers]
+    column_provided = dataframe.columns.values.tolist()
+    if column_needed not in column_provided:
+      error_str = "Columns not found in DataFrame. Compulsory column: '{}', given: '{}".format(
+        column_needed,
+        column_provided
+      )
+      raise LookupError(error_str)
+
+    # Estimate the number of files that will be created.
+    num_rows = len(dataframe)
+
+
+
+
+

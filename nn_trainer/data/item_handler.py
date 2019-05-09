@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import pandas as pd
 from typing import Dict, List, Union
 
 
@@ -10,8 +11,10 @@ def _int_feature(value: Union[bool, int, List[Union[bool, int]]]) -> tf.train.Fe
   return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
 
 
-def _float_feature(value: float) -> tf.train.Feature:
+def _float_feature(value: Union[float, List[float]]) -> tf.train.Feature:
   """Returns a float_list from a float / double."""
+  if not isinstance(value, (tuple, list)):
+    value = [value]
   return tf.train.Feature(float_list=tf.train.FloatList(value=[value]))
 
 
@@ -53,13 +56,21 @@ class ItemHandler(object):
     """
     pass
 
-  def deserialize(self, record: str) -> Dict:
-    """Deserialize a record and produce a Dictionary of `tf.Tensor`."""
+  def deserialization_post_processing(self, parsed_example: Dict[str, tf.Tensor]) -> Dict[str, tf.Tensor]:
+    """Step to finalize the item deserialization.
+
+    This function is typically run after a string record have been parsed to
+    obtain the proper deserialized item.
+    """
     pass
 
   def serialize(self, data) -> Dict:
     """Serialize item into a key-value pair."""
     pass
+
+  def prepare_data(self, data: pd.Series):
+    """Function used to convert a pd.Series to an `ItemHandler`."""
+    raise NotImplementedError("ItemHandler.prepare_data cannot be used by base class ItemHandler.")
 
 
 class NPArrayHandler(ItemHandler):
@@ -109,6 +120,26 @@ class NPArrayHandler(ItemHandler):
       self._depth_key(): tf.io.FixedLenFeature([], tf.int64)
     }
 
+  def deserialization_post_processing(self, parsed_example: Dict[str, tf.Tensor]) -> Dict[str, tf.Tensor]:
+    """Step to finalize the item deserialization.
+
+    This function is typically run after a string record have been parsed to
+    obtain the proper deserialized item.
+    """
+    np_key = self.key
+    height = parsed_example[self._height_key()]
+    width = parsed_example[self._width_key()]
+    depth = parsed_example[self._depth_key()]
+    parsed_example[np_key] = tf.io.decode_raw(
+      bytes=parsed_example[np_key],
+      out_type=self.tf_dtype
+    )
+    parsed_example[np_key] = tf.reshape(
+      tensor=parsed_example[np_key],
+      shape=[height, width, depth]
+    )
+    return parsed_example
+
   def serialize(self, data: np.ndarray) -> Dict:
     """Serialize item into a key-value pair."""
     if not isinstance(data, np.ndarray):
@@ -140,10 +171,6 @@ class TextHandler(ItemHandler):
     return {
       self._key: tf.io.FixedLenFeature([], tf.string),
     }
-
-  def deserialize(self, record: str) -> Dict:
-    """Deserialize a record and produce a Dictionary of `tf.Tensor`."""
-    pass
 
   def serialize(self, data: str) -> Dict:
     """Serialize item into a key-value pair."""
