@@ -5,7 +5,8 @@ from setuptools import setup, find_packages
 runtime_dependencies = [
   'Pillow>=6.0.0',
   'tensorflow==2.0.0-alpha0',
-  'pandas'
+  'pandas',
+  'tqdm'
 ]
 
 build_dependencies = [
