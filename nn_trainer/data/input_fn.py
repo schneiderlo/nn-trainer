@@ -1,3 +1,5 @@
+import os
+import glob
 import tensorflow as tf
 from typing import List
 
@@ -43,3 +45,33 @@ class InputPipeline(object):
                .batch(batch_size=self._batch_size, drop_remainder=True)
                .prefetch(buffer_size=self._autotune))
     return dataset
+
+
+def load_shards_from_dir(shard_directory: str):
+  """Load shards to be used by tensorflow.
+
+  Args:
+    shard_directory: Directory containing tfrecords.
+  Return: A list of paths to tfrecords.
+  """
+  list_filenames = glob.iglob(f"{shard_directory}/**/*.tfr", recursive=True)
+  return [os.path.join(shard_directory, f)
+          for f in list_filenames]
+
+
+def get_number_samples(shard_directory: str) -> int:
+  """Return the number of samples stored in a directory. """
+  list_shards = load_shards_from_dir(shard_directory)
+
+  def parse_record(record):
+    return record
+
+  num_samples = 0
+  for tfrecords_path in list_shards:
+    ds = tf.data.TFRecordDataset(tfrecords_path)
+    ds = ds.map(parse_record)
+    ds = ds.batch(1)
+
+    for _ in ds:
+        num_samples += 1
+  return num_samples
