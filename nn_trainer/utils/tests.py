@@ -37,6 +37,7 @@ def get_test_directory(request, clear: bool = True):
     get_project_root(),
     'build',
     'tests',
+    'tests',
     dir_name
   )
   if os.path.exists(directory_path) and os.path.isdir(directory_path) and clear:

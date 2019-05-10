@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Union
 
+from nn_trainer.utils.image import imread
+
 
 def _int_feature(value: Union[bool, int, List[Union[bool, int]]]) -> tf.train.Feature:
   """Return a int64_list from a bool, an enum, an integer."""
@@ -15,7 +17,7 @@ def _float_feature(value: Union[float, List[float]]) -> tf.train.Feature:
   """Returns a float_list from a float / double."""
   if not isinstance(value, (tuple, list)):
     value = [value]
-  return tf.train.Feature(float_list=tf.train.FloatList(value=[value]))
+  return tf.train.Feature(float_list=tf.train.FloatList(value=value))
 
 
 def _bytes_feature(value: bytes) -> tf.train.Feature:
@@ -62,13 +64,13 @@ class ItemHandler(object):
     This function is typically run after a string record have been parsed to
     obtain the proper deserialized item.
     """
-    pass
+    return parsed_example
 
   def serialize(self, data) -> Dict:
     """Serialize item into a key-value pair."""
     pass
 
-  def prepare_data(self, data: pd.Series):
+  def serialize_from_series(self, data: pd.Series):
     """Function used to convert a pd.Series to an `ItemHandler`."""
     raise NotImplementedError("ItemHandler.prepare_data cannot be used by base class ItemHandler.")
 
@@ -88,6 +90,7 @@ class NPArrayHandler(ItemHandler):
   def __init__(self, key, np_dtype):
     """Initializes the ImageHandler."""
     super(NPArrayHandler, self).__init__(key=key)
+    self._np_dtype = np_dtype
     self._tf_dtype = self.nptype_to_tftype[np_dtype]
 
   @property
@@ -153,6 +156,12 @@ class NPArrayHandler(ItemHandler):
       self._depth_key(): _int_feature(depth)
     }
 
+  def serialize_from_series(self, data: pd.Series) -> Dict:
+    """Load an image with its path extracted from a pandas Series."""
+    src = imread(path=data[self.key], dtype=self._np_dtype)
+    src = src[..., np.newaxis]
+    return self.serialize(src)
+
 
 class TextHandler(ItemHandler):
   """An ItemHandler that take care of text."""
@@ -181,3 +190,36 @@ class TextHandler(ItemHandler):
     return {
       self._key: _bytes_feature(data)
     }
+
+  def serialize_from_series(self, data: pd.Series) -> Dict:
+    """Load a text with its path extracted from a pandas Series."""
+    return self.serialize(data[self.key])
+
+
+class FloatMetricHandler(ItemHandler):
+  """An ItemHandler that take care of metrics."""
+
+  def __init__(self, key):
+    """Initializes the ImageHandler."""
+    super(FloatMetricHandler, self).__init__(key=key)
+
+  def _deserialize_dict(self) -> Dict:
+    """Format a dict to be used by `tf.parse_single_example`.
+
+    Returns:
+      A `dict` mapping feature keys to `FixedLenFeature` or
+      `VarLenFeature` values.
+    """
+    return {
+      self._key: tf.io.FixedLenFeature([], tf.float32),
+    }
+
+  def serialize(self, data: List[float]) -> Dict:
+    """Serialize item into a key-value pair."""
+    return {
+      self._key: _float_feature(data)
+    }
+
+  def serialize_from_series(self, data: pd.Series) -> Dict:
+    """Load a text with its path extracted from a pandas Series."""
+    return self.serialize(data[self.key])

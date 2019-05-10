@@ -3,7 +3,7 @@ import tensorflow as tf
 import pytest
 
 from tests import get_lenna
-from nn_trainer.data.item_handler import ItemHandler, NPArrayHandler, TextHandler
+from nn_trainer.data.item_handler import ItemHandler, NPArrayHandler, TextHandler, FloatMetricHandler
 
 
 NUMPY_DTYPE = [
@@ -48,3 +48,15 @@ def test_texthandler(request):
     features=text_item._deserialize_dict()
   )
   assert parsed_example['item-1'].numpy().decode('utf-8') == 'Some texts to print.'
+
+
+@pytest.mark.parametrize('metric_value', [10, 1, 0, 0.1, 0.01, 0.001])
+def test_floatmetrichandler(request, metric_value):
+  metric_value = np.float32(metric_value)
+  item = FloatMetricHandler('item-1')
+  proto_str = get_example_proto(item_handler=item, data=metric_value)
+  parsed_example = tf.io.parse_single_example(
+    serialized=proto_str,
+    features=item._deserialize_dict()
+  )
+  assert parsed_example['item-1'].numpy() == metric_value

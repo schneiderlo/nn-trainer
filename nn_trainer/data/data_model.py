@@ -1,8 +1,11 @@
+import os
 import tensorflow as tf
 import pandas as pd
-from typing import Dict, List
+import numpy as np
+from sys import getsizeof
+from typing import Dict, List, Union
 
-from .item_handler import ItemHandler, NPArrayHandler
+from nn_trainer.data.item_handler import ItemHandler
 
 
 class DataModel(object):
@@ -34,12 +37,20 @@ class DataModel(object):
       parsed_example = item_handler.deserialization_post_processing(parsed_example)
     return parsed_example
 
-  def serialize(self, data: Dict) -> tf.train.Example:
+  def serialize(self, data: Union[Dict, pd.Series]) -> tf.train.Example:
     """Serialize item into a `tf.train.Example`."""
+
+    def serialize_fn(item_handler: ItemHandler):
+      if isinstance(data, dict):
+        return item_handler.serialize(data=data[item_handler.key])
+      elif isinstance(data, pd.Series):
+        return item_handler.serialize_from_series(data=data)
+      else:
+        raise NameError('Data to serialize must either be a dict or a `pd.Series`.')
+
     features = {}
     for item_handler in self._item_handlers:
-      item_data = data[item_handler.key]
-      item_serialized = item_handler.serialize(item_data)
+      item_serialized = serialize_fn(item_handler)
       features.update(item_serialized)
     return tf.train.Example(
       features=tf.train.Features(
@@ -77,7 +88,7 @@ class DataModel(object):
     """
     column_needed = [item_handler.key for item_handler in self._item_handlers]
     column_provided = dataframe.columns.values.tolist()
-    if column_needed not in column_provided:
+    if not set(column_needed).issubset(set(column_provided)):
       error_str = "Columns not found in DataFrame. Compulsory column: '{}', given: '{}".format(
         column_needed,
         column_provided
@@ -85,9 +96,23 @@ class DataModel(object):
       raise LookupError(error_str)
 
     # Estimate the number of files that will be created.
-    num_rows = len(dataframe)
+    first_row = dataframe.iloc[0]
+    serialize_row = self.serialize(first_row).SerializeToString()
+    data_size_mb = getsizeof(serialize_row) * 1e-6
+    num_items = len(dataframe)
+    expected_size_mb = num_items * data_size_mb
 
+    num_shards = int(expected_size_mb // max_size) + 1
+    print("A serialized data takes {:.2f} MB.".format(data_size_mb))
+    print("The total expected size {:.2f} MB.\n".format(expected_size_mb))
 
-
-
-
+    # Serialize data into a series of tfrecord files.
+    splitted_index = np.array_split(range(0, num_items), num_shards)
+    for j, indexes in enumerate(splitted_index):
+      tfrecord_path = os.path.join(output_dir, 'shard_{}.tfr'.format(j))
+      with tf.io.TFRecordWriter(tfrecord_path) as writer:
+        for i in indexes:
+          row = dataframe.iloc[i]
+          serialized_data = self.serialize(data=row)
+          serialized_data_str = serialized_data.SerializeToString()
+          writer.write(serialized_data_str)
