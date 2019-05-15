@@ -1,3 +1,4 @@
+import os
 import tensorflow as tf
 import numpy as np
 import pandas as pd
@@ -37,7 +38,8 @@ class ItemHandler(object):
   parsing.
   """
 
-  def __init__(self, key):
+  def __init__(self,
+               key):
     """Initializes the ItemHandler.
 
     Args:
@@ -158,7 +160,9 @@ class NPArrayHandler(ItemHandler):
 
   def serialize_from_series(self, data: pd.Series) -> Dict:
     """Load an image with its path extracted from a pandas Series."""
-    src = imread(path=data[self.key], dtype=self._np_dtype)
+    src_path = data[self.key]
+    ext = os.path.splitext(src_path)[1]
+    src = np.load(src_path) if ext == '.npy' else imread(path=src_path, dtype=self._np_dtype)
     src = src[..., np.newaxis]
     return self.serialize(src)
 

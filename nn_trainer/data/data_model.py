@@ -41,11 +41,11 @@ class DataModel(object):
   def serialize(self, data: Union[Dict, pd.Series]) -> tf.train.Example:
     """Serialize item into a `tf.train.Example`."""
 
-    def serialize_fn(item_handler: ItemHandler):
+    def serialize_fn(handler: ItemHandler):
       if isinstance(data, dict):
-        return item_handler.serialize(data=data[item_handler.key])
+        return handler.serialize(data=data[handler.key])
       elif isinstance(data, pd.Series):
-        return item_handler.serialize_from_series(data=data)
+        return handler.serialize_from_series(data=data)
       else:
         raise NameError('Data to serialize must either be a dict or a `pd.Series`.')
 
