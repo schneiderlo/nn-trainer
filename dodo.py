@@ -3,7 +3,7 @@ from pydoit_project_builder import TaskCreator
 
 # Define project parameters.
 project_name = "nn-trainer"
-python_version = "3"
+python_version = "3.6"
 # Instantiate tasks for pydoit library.
 task_creator = TaskCreator(
     project_name=project_name, python_version=python_version)
