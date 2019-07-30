@@ -136,7 +136,7 @@ class NPArrayHandler(ItemHandler):
     width = parsed_example[self._width_key()]
     depth = parsed_example[self._depth_key()]
     parsed_example[np_key] = tf.io.decode_raw(
-      bytes=parsed_example[np_key],
+      input_bytes=parsed_example[np_key],
       out_type=self.tf_dtype
     )
     parsed_example[np_key] = tf.reshape(
