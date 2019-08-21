@@ -44,6 +44,33 @@ class TFRandomOperator(object):
     pass
 
 
+class ConversionOp(TFRandomOperator):
+
+  def __init__(self, output_tf_type) -> None:
+    super(ConversionOp, self).__init__(random_apply_ratio=1., seed=None)
+    self._output_tf_type = output_tf_type
+
+  def apply_impl(self, src: tf.Tensor) -> tf.Tensor:
+    return tf.cast(src, dtype=self._output_tf_type)
+
+
+class ChangeRangeOp(TFRandomOperator):
+
+  def __init__(self,
+               initial_range_start: float,
+               initial_range_end: float,
+               final_range_start: float,
+               final_range_end: float) -> None:
+    super(ChangeRangeOp, self).__init__(random_apply_ratio=1., seed=None)
+    self._initial_range_start = initial_range_start
+    self._initial_range_end = initial_range_end
+    self._final_range_start = final_range_start
+    self._final_range_end = final_range_end
+
+  def apply_impl(self, src: tf.Tensor) -> tf.Tensor:
+    return src
+
+
 class RandomRotation90(TFRandomOperator):
   """Operator that rotate an image randomly by 0°, 90°, 180° and 270°."""
 

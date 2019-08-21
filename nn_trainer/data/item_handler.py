@@ -5,6 +5,7 @@ import pandas as pd
 from typing import Dict, List, Union
 
 from nn_trainer.utils.image import imread
+from nn_trainer.data.data_augmentation import TFRandomOperator
 
 
 def _int_feature(value: Union[bool, int, List[Union[bool, int]]]) -> tf.train.Feature:
@@ -89,11 +90,15 @@ class NPArrayHandler(ItemHandler):
     np.float64: tf.float64,
   }
 
-  def __init__(self, key, np_dtype):
+  def __init__(self,
+               key,
+               np_dtype,
+               data_augmentation_ops: Union[List[TFRandomOperator], None] = None):
     """Initializes the ImageHandler."""
     super(NPArrayHandler, self).__init__(key=key)
     self._np_dtype = np_dtype
     self._tf_dtype = self.nptype_to_tftype[np_dtype]
+    self._data_augmentation_ops = data_augmentation_ops
 
   @property
   def tf_dtype(self):
@@ -143,6 +148,8 @@ class NPArrayHandler(ItemHandler):
       tensor=parsed_example[np_key],
       shape=[height, width, depth]
     )
+    for op in self._data_augmentation_ops:
+      parsed_example[np_key] = op(parsed_example[np_key])
     return parsed_example
 
   def serialize(self, data: np.ndarray) -> Dict:
@@ -226,4 +233,40 @@ class FloatMetricHandler(ItemHandler):
 
   def serialize_from_series(self, data: pd.Series) -> Dict:
     """Load a text with its path extracted from a pandas Series."""
+    return self.serialize(data[self.key])
+
+
+class IntHandler(ItemHandler):
+  """An ItemHandler that take care of integers.
+  The following types are allowed:
+    - bool
+    - enum
+    - int32
+    - uint32
+    - int64
+    - uint64
+  """
+
+  def __init__(self, key, int_type):
+    """Initializes the ImageHandler."""
+    super(IntHandler, self).__init__(key=key)
+    self._int_type = int_type
+
+  def _deserialize_dict(self) -> Dict:
+    """Format a dict to be used by `tf.parse_single_example`.
+    Returns:
+      A `dict` mapping feature keys to `FixedLenFeature` or
+      `VarLenFeature` values.
+    """
+    return {
+      self._key: tf.io.FixedLenFeature([], self._int_type),
+    }
+
+  def serialize(self, data: List[int]) -> Dict:
+    """Serialize item into a key-value pair."""
+    return {
+      self._key: _int_feature(data)
+    }
+
+  def serialize_from_series(self, data: pd.Series) -> Dict:
     return self.serialize(data[self.key])
